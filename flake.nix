@@ -2,33 +2,38 @@
   description = "CozoDB standalone built with Rust-Nightly";
 
   inputs = {
+    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "nixpkgs/nixos-unstable";
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    flake-utils.url = "github:numtide/flake-utils";
-    nixpkgs.url = "nixpkgs/nixos-unstable";
-    cozodb.url = "https://github.com/cozodb/cozo.git?ref=master&rev=fe24ee29870dc4135bbcf57e644f1c4e87ee7fc5";
-    cozodb.flake = false;
-    cozodb.type = "git";
-    cozodb.submodules = true;
+    cozodb = {
+      type = "git";
+      url = "https://github.com/cozodb/cozo.git?ref=master";
+      flake = false;
+      submodules = true;
+    };
   };
 
   outputs = { self, fenix, flake-utils, nixpkgs, cozodb }:
      (flake-utils.lib.eachDefaultSystem (system:
-      let pkgs = nixpkgs.legacyPackages.${system}; in
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+        toolchain = fenix.packages.${system}.stable.toolchain;
+      in
       {
         defaultPackage = (pkgs.makeRustPlatform {
-          inherit (fenix.packages.${system}.minimal) cargo rustc;
+          cargo = toolchain;
+          rustc = toolchain;
         }).buildRustPackage {
-          nativeBuildInputs = with pkgs; [
-            cmake
-          ];
-          buildInputs = with pkgs; [
-            jemalloc
-          ];
-          cmakeFlags = pkgs.rocksdb.cmakeFlags;
-          env.NIX_CFLAGS_COMPILE = pkgs.rocksdb.NIX_CFLAGS_COMPILE;
+          pname = "cozo-bin";
+          version = builtins.readFile "${cozodb}/VERSION";
+          src = cozodb;
+
+          nativeBuildInputs = [ pkgs.cmake ];
+          buildInputs = [ pkgs.jemalloc ];
+          inherit (pkgs.rocksdb) cmakeFlags NIX_CFLAGS_COMPILE;
 
           propagatedBuildInputs = with pkgs; [
             bzip2
@@ -37,13 +42,8 @@
             zlib
             zstd
           ];
-          pname = "cozo-bin";
-          version = "0.7.0";
-          src = cozodb;
 
-          cargoLock = {
-            lockFile = "${cozodb}/Cargo.lock";
-          };
+          cargoLock.lockFile = "${cozodb}/Cargo.lock";
 
           buildFeatures = [
             "compact"
