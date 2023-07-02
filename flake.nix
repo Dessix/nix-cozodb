@@ -52,6 +52,9 @@
             "graph-algo"
             "storage-rocksdb"
           ];
+          __contentAddressed = true;
+          outputHashAlgo = "sha256";
+          outputHashMode = "recursive";
         };
       }));
 }
